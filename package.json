@@ -1,0 +1,33 @@
+{
+  "name": "ticktick-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "auth": "node dist/auth-cli.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:mcp": "vitest run tests/mcp",
+    "precommit": "npm audit --audit-level=high && vitest run"
+  },
+  "bin": {
+    "ticktick-mcp": "./dist/index.js",
+    "ticktick-mcp-auth": "./dist/auth-cli.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.26.0",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "25.3.0",
+    "typescript": "5.9.3",
+    "vitest": "4.0.18"
+  }
+}
