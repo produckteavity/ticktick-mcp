@@ -1,3 +1,5 @@
+import { TokenRefreshResponse } from './types.js';
+
 export class AuthError extends Error {
   constructor(message: string) {
     super(message);
@@ -68,7 +70,23 @@ export class TokenManager {
       );
     }
 
-    const data = await response.json();
+    let rawData: unknown;
+    try {
+      rawData = await response.json();
+    } catch {
+      throw new AuthError(
+        'Token refresh returned malformed response. Run `ticktick-mcp-auth` to re-authorize.'
+      );
+    }
+
+    const parsed = TokenRefreshResponse.safeParse(rawData);
+    if (!parsed.success) {
+      throw new AuthError(
+        'Token refresh returned invalid data. Run `ticktick-mcp-auth` to re-authorize.'
+      );
+    }
+
+    const data = parsed.data;
     const now = Math.floor(Date.now() / 1000);
 
     await this.keychain.set('access_token', data.access_token);

@@ -10,6 +10,7 @@ export const CreateTaskInput = z.object({
   priority: z.union([z.literal(0), z.literal(1), z.literal(3), z.literal(5)]).optional(),
   dueDate: z.string().optional(),
   startDate: z.string().optional(),
+  repeatFlag: z.string().optional(),
 });
 
 export const GetTaskInput = z.object({
@@ -33,6 +34,7 @@ export const UpdateTaskInput = z.object({
   priority: z.union([z.literal(0), z.literal(1), z.literal(3), z.literal(5)]).optional(),
   dueDate: z.string().nullable().optional(),
   startDate: z.string().nullable().optional(),
+  repeatFlag: z.string().optional(),
 });
 
 export const CompleteTaskInput = z.object({
@@ -50,6 +52,16 @@ export const CreateProjectInput = z.object({
   name: z.string().min(1).max(200),
 });
 
+// --- OAuth token response schema ---
+
+export const TokenRefreshResponse = z.object({
+  access_token: z.string(),
+  refresh_token: z.string().optional(),
+  expires_in: z.number(),
+});
+
+export type TokenRefreshResponseType = z.infer<typeof TokenRefreshResponse>;
+
 // --- API response schemas (output validation) ---
 
 const truncate = (max: number) =>
@@ -66,6 +78,7 @@ export const TickTickTask = z
     priority: z.number().optional().default(0),
     dueDate: z.string().nullable().optional(),
     startDate: z.string().nullable().optional(),
+    repeatFlag: z.string().optional(),
     completedTime: z.string().nullable().optional(),
     createdTime: z.string().optional(),
     modifiedTime: z.string().optional(),
