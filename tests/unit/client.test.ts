@@ -88,6 +88,28 @@ describe('TickTickClient', () => {
       );
     });
 
+    it('createTask sends repeatFlag in API body', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 't1', title: 'Recurring', repeatFlag: 'RRULE:FREQ=MONTHLY;INTERVAL=1' })),
+      });
+
+      await client.createTask({ title: 'Recurring', repeatFlag: 'RRULE:FREQ=MONTHLY;INTERVAL=1' });
+      const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(callBody.repeatFlag).toBe('RRULE:FREQ=MONTHLY;INTERVAL=1');
+    });
+
+    it('updateTask sends repeatFlag in API body', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 't1', title: 'Updated', repeatFlag: 'RRULE:FREQ=WEEKLY;INTERVAL=2' })),
+      });
+
+      await client.updateTask('t1', { repeatFlag: 'RRULE:FREQ=WEEKLY;INTERVAL=2' });
+      const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(callBody.repeatFlag).toBe('RRULE:FREQ=WEEKLY;INTERVAL=2');
+    });
+
     it('throws TickTickApiError on 500', async () => {
       mockFetch.mockResolvedValue({
         ok: false,

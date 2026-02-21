@@ -15,7 +15,7 @@ function error(msg: string) {
 export function registerTaskTools(server: McpServer, client: TickTickClient): void {
   server.tool(
     'ticktick_create_task',
-    'Use this to create a new task in TickTick. Required: title. Optional: content, projectId (omit for Inbox), tags (array of strings), priority (0=none, 1=low, 3=medium, 5=high), dueDate, startDate (ISO 8601 strings).',
+    'Use this to create a new task in TickTick. Required: title. Optional: content, projectId (omit for Inbox), tags (array of strings), priority (0=none, 1=low, 3=medium, 5=high), dueDate, startDate (ISO 8601 strings), repeatFlag (iCalendar RRULE string).',
     {
       title: z.string().min(1).max(500).describe('Task title'),
       content: z.string().max(5000).optional().describe('Task description/notes'),
@@ -24,10 +24,11 @@ export function registerTaskTools(server: McpServer, client: TickTickClient): vo
       priority: z.union([z.literal(0), z.literal(1), z.literal(3), z.literal(5)]).optional().describe('Priority: 0=none, 1=low, 3=medium, 5=high'),
       dueDate: z.string().optional().describe('Due date in ISO 8601 format'),
       startDate: z.string().optional().describe('Start date in ISO 8601 format'),
+      repeatFlag: z.string().optional().describe("iCalendar RRULE string for recurring tasks (e.g., 'RRULE:FREQ=MONTHLY;INTERVAL=1')"),
     },
-    async ({ title, content, projectId, tags, priority, dueDate, startDate }) => {
+    async ({ title, content, projectId, tags, priority, dueDate, startDate, repeatFlag }) => {
       try {
-        const input = CreateTaskInput.parse({ title, content, projectId, tags, priority, dueDate, startDate });
+        const input = CreateTaskInput.parse({ title, content, projectId, tags, priority, dueDate, startDate, repeatFlag });
         const task = await client.createTask(input);
         return success(task);
       } catch (e: any) {
@@ -104,7 +105,7 @@ export function registerTaskTools(server: McpServer, client: TickTickClient): vo
 
   server.tool(
     'ticktick_update_task',
-    'Use this to modify an existing task. Required: taskId. Optional: title, content, tags, priority, dueDate, startDate. Only provided fields are updated.',
+    'Use this to modify an existing task. Required: taskId. Optional: title, content, tags, priority, dueDate, startDate, repeatFlag. Only provided fields are updated.',
     {
       taskId: z.string().describe('Task ID to update'),
       title: z.string().min(1).max(500).optional().describe('New title'),
@@ -113,10 +114,11 @@ export function registerTaskTools(server: McpServer, client: TickTickClient): vo
       priority: z.union([z.literal(0), z.literal(1), z.literal(3), z.literal(5)]).optional().describe('Priority: 0=none, 1=low, 3=medium, 5=high'),
       dueDate: z.string().nullable().optional().describe('Due date (ISO 8601) or null to clear'),
       startDate: z.string().nullable().optional().describe('Start date (ISO 8601) or null to clear'),
+      repeatFlag: z.string().optional().describe("iCalendar RRULE string for recurring tasks (e.g., 'RRULE:FREQ=MONTHLY;INTERVAL=1')"),
     },
-    async ({ taskId, title, content, tags, priority, dueDate, startDate }) => {
+    async ({ taskId, title, content, tags, priority, dueDate, startDate, repeatFlag }) => {
       try {
-        const input = UpdateTaskInput.parse({ taskId, title, content, tags, priority, dueDate, startDate });
+        const input = UpdateTaskInput.parse({ taskId, title, content, tags, priority, dueDate, startDate, repeatFlag });
         const { taskId: id, ...updates } = input;
         const task = await client.updateTask(id, updates);
         return success(task);
