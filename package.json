@@ -10,7 +10,6 @@
   },
   "homepage": "https://github.com/produckteavity/ticktick-mcp#readme",
   "keywords": ["mcp", "mcp-server", "ticktick", "model-context-protocol", "tasks", "task-management", "ai", "llm", "claude", "productivity", "todo"],
-  "os": ["darwin"],
   "engines": {
     "node": ">=18.0.0"
   },
