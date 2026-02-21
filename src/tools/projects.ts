@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { TickTickClient } from '../ticktick-client.js';
+import { formatToolError } from './tasks.js';
 
 function success(data: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
@@ -19,8 +20,8 @@ export function registerProjectTools(server: McpServer, client: TickTickClient):
       try {
         const projects = await client.getProjects();
         return success(projects);
-      } catch (e: any) {
-        return error(`Failed to get projects: ${e.message}`);
+      } catch (e: unknown) {
+        return error(`Failed to get projects: ${formatToolError(e)}`);
       }
     },
   );
@@ -35,8 +36,8 @@ export function registerProjectTools(server: McpServer, client: TickTickClient):
       try {
         const project = await client.createProject({ name });
         return success(project);
-      } catch (e: any) {
-        return error(`Failed to create project: ${e.message}`);
+      } catch (e: unknown) {
+        return error(`Failed to create project: ${formatToolError(e)}`);
       }
     },
   );
