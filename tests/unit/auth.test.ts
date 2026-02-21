@@ -201,6 +201,37 @@ describe('TokenManager', () => {
       expect(mockKeychain.set).not.toHaveBeenCalled();
     });
 
+    it('forceRefresh refreshes token even when current token has not expired', async () => {
+      const futureExpiry = String(Math.floor(Date.now() / 1000) + 3600);
+      mockKeychain.get.mockImplementation((key: string) => {
+        if (key === 'access_token') return 'still-valid-token';
+        if (key === 'expires_at') return futureExpiry;
+        if (key === 'refresh_token') return 'my-refresh-token';
+        if (key === 'client_secret') return 'my-client-secret';
+        return null;
+      });
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          access_token: 'force-refreshed-token',
+          refresh_token: 'new-refresh-token',
+          expires_in: 3600,
+        }),
+      });
+
+      // getValidAccessToken would return the cached token without refreshing
+      const cachedToken = await tokenManager.getValidAccessToken();
+      expect(cachedToken).toBe('still-valid-token');
+      expect(mockFetch).not.toHaveBeenCalled();
+
+      // forceRefresh should bypass expiry check and actually refresh
+      const freshToken = await tokenManager.forceRefresh();
+      expect(freshToken).toBe('force-refreshed-token');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockKeychain.set).toHaveBeenCalledWith('access_token', 'force-refreshed-token');
+    });
+
     it('stores tokens correctly when refresh response is valid', async () => {
       const pastExpiry = String(Math.floor(Date.now() / 1000) - 100);
       mockKeychain.get.mockImplementation((key: string) => {

@@ -25,6 +25,10 @@ export class TokenManager {
     private readonly fetchFn: FetchFn = globalThis.fetch,
   ) {}
 
+  async forceRefresh(): Promise<string> {
+    return this.refreshAccessToken();
+  }
+
   async getValidAccessToken(): Promise<string> {
     const accessToken = await this.keychain.get('access_token');
     const expiresAt = await this.keychain.get('expires_at');
