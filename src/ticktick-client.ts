@@ -69,7 +69,9 @@ export class TickTickClient {
     body?: unknown,
     isRetry = false,
   ): Promise<any> {
-    const token = await this.tokenManager.getValidAccessToken();
+    const token = isRetry
+      ? await this.tokenManager.forceRefresh()
+      : await this.tokenManager.getValidAccessToken();
 
     const options: RequestInit = {
       method,
@@ -88,11 +90,27 @@ export class TickTickClient {
 
     if (response.ok) {
       const text = await response.text();
-      return text ? JSON.parse(text) : null;
+      if (!text) return null;
+      try {
+        return JSON.parse(text);
+      } catch {
+        const snippet = text.length > 200 ? text.slice(0, 200) + '...' : text;
+        throw new TickTickApiError(
+          response.status,
+          `Response is not valid JSON: ${snippet}`,
+        );
+      }
     }
 
     if (response.status === 401 && !isRetry) {
       return this.request(method, path, body, true);
+    }
+
+    if (response.status === 401 && isRetry) {
+      throw new TickTickApiError(
+        401,
+        'Authentication failed after token refresh. Run `ticktick-mcp-auth` to re-authorize.',
+      );
     }
 
     if (response.status === 429) {

@@ -40,6 +40,59 @@ describe('CreateTaskInput', () => {
     const result = CreateTaskInput.safeParse({ title: 'Test', priority: 2 });
     expect(result.success).toBe(false);
   });
+
+  it('accepts optional repeatFlag', () => {
+    const result = CreateTaskInput.safeParse({
+      title: 'Monthly review',
+      repeatFlag: 'RRULE:FREQ=MONTHLY;INTERVAL=1',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.repeatFlag).toBe('RRULE:FREQ=MONTHLY;INTERVAL=1');
+    }
+  });
+
+  it('accepts input without repeatFlag', () => {
+    const result = CreateTaskInput.safeParse({ title: 'One-off task' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.repeatFlag).toBeUndefined();
+    }
+  });
+
+  it('rejects non-string repeatFlag', () => {
+    const result = CreateTaskInput.safeParse({ title: 'Test', repeatFlag: 123 });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('UpdateTaskInput', () => {
+  it('accepts optional repeatFlag', () => {
+    const result = UpdateTaskInput.safeParse({
+      taskId: 'task123',
+      repeatFlag: 'RRULE:FREQ=WEEKLY;INTERVAL=2',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.repeatFlag).toBe('RRULE:FREQ=WEEKLY;INTERVAL=2');
+    }
+  });
+
+  it('accepts input without repeatFlag', () => {
+    const result = UpdateTaskInput.safeParse({
+      taskId: 'task123',
+      title: 'Updated title',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.repeatFlag).toBeUndefined();
+    }
+  });
+
+  it('rejects non-string repeatFlag', () => {
+    const result = UpdateTaskInput.safeParse({ taskId: 'task123', repeatFlag: true });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('GetTasksInput', () => {
@@ -85,6 +138,20 @@ describe('TickTickTask (API response)', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.title.length).toBeLessThanOrEqual(500);
+    }
+  });
+
+  it('preserves repeatFlag from API response', () => {
+    const result = TickTickTask.safeParse({
+      id: 'task123',
+      title: 'Recurring task',
+      projectId: 'proj456',
+      status: 0,
+      repeatFlag: 'RRULE:FREQ=DAILY;INTERVAL=1',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.repeatFlag).toBe('RRULE:FREQ=DAILY;INTERVAL=1');
     }
   });
 

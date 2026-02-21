@@ -4,6 +4,7 @@ import { TickTickClient, TickTickApiError, TickTickRateLimitError } from '../../
 describe('TickTickClient', () => {
   const mockTokenManager = {
     getValidAccessToken: vi.fn().mockResolvedValue('test-token'),
+    forceRefresh: vi.fn().mockResolvedValue('refreshed-token'),
   };
   const mockFetch = vi.fn();
   let client: TickTickClient;
@@ -60,7 +61,8 @@ describe('TickTickClient', () => {
       });
 
       const result = await client.getProjects();
-      expect(mockTokenManager.getValidAccessToken).toHaveBeenCalledTimes(2);
+      expect(mockTokenManager.getValidAccessToken).toHaveBeenCalledTimes(1);
+      expect(mockTokenManager.forceRefresh).toHaveBeenCalledTimes(1);
       expect(result).toEqual([]);
     });
 
@@ -88,6 +90,28 @@ describe('TickTickClient', () => {
       );
     });
 
+    it('createTask sends repeatFlag in API body', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 't1', title: 'Recurring', repeatFlag: 'RRULE:FREQ=MONTHLY;INTERVAL=1' })),
+      });
+
+      await client.createTask({ title: 'Recurring', repeatFlag: 'RRULE:FREQ=MONTHLY;INTERVAL=1' });
+      const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(callBody.repeatFlag).toBe('RRULE:FREQ=MONTHLY;INTERVAL=1');
+    });
+
+    it('updateTask sends repeatFlag in API body', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 't1', title: 'Updated', repeatFlag: 'RRULE:FREQ=WEEKLY;INTERVAL=2' })),
+      });
+
+      await client.updateTask('t1', { repeatFlag: 'RRULE:FREQ=WEEKLY;INTERVAL=2' });
+      const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(callBody.repeatFlag).toBe('RRULE:FREQ=WEEKLY;INTERVAL=2');
+    });
+
     it('throws TickTickApiError on 500', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
@@ -96,6 +120,78 @@ describe('TickTickClient', () => {
       });
 
       await expect(client.getProjects()).rejects.toThrow(TickTickApiError);
+    });
+
+    it('returns null for 200 response with empty body', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(''),
+      });
+
+      const result = await client.getProjects();
+      expect(result).toBeNull();
+    });
+
+    it('throws TickTickApiError when 200 response has invalid JSON', async () => {
+      const invalidBody = '<html><body>Bad Gateway</body></html>';
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(invalidBody),
+      });
+
+      await expect(client.getProjects()).rejects.toThrow(TickTickApiError);
+      await expect(client.getProjects()).rejects.toThrow(/Bad Gateway/);
+    });
+
+    it('truncates long invalid response body in error message', async () => {
+      const longBody = 'X'.repeat(500);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(longBody),
+      });
+
+      try {
+        await client.getProjects();
+        expect.unreachable('should have thrown');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(TickTickApiError);
+        expect(err.status).toBe(200);
+        // Message should contain at most ~200 chars of body, not the full 500
+        expect(err.message.length).toBeLessThan(500);
+        expect(err.message).toContain('...');
+      }
+    });
+
+    it('calls forceRefresh before retrying on 401', async () => {
+      let callCount = 0;
+      mockFetch.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({ ok: false, status: 401, text: () => Promise.resolve('Unauthorized') });
+        }
+        return Promise.resolve({ ok: true, text: () => Promise.resolve('[]') });
+      });
+
+      await client.getProjects();
+
+      // forceRefresh should have been called before the retry
+      expect(mockTokenManager.forceRefresh).toHaveBeenCalledTimes(1);
+      // getValidAccessToken is called for the initial request, then forceRefresh for the retry
+      expect(mockTokenManager.getValidAccessToken).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('throws with re-auth guidance on double 401', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: () => Promise.resolve('Unauthorized'),
+      });
+
+      await expect(client.getProjects()).rejects.toThrow(TickTickApiError);
+      await expect(client.getProjects()).rejects.toThrow(/ticktick-mcp-auth/);
     });
   });
 });
