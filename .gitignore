@@ -4,3 +4,19 @@ dist/
 .env.*
 .token-*
 .DS_Store
+
+# Local config
+.mcp.json
+docker-compose.yml
+docker/
+
+# IDE
+.idea/
+.vscode/
+
+# Claude Code
+.claude/
+
+# Test / build artifacts
+coverage/
+*.tgz
