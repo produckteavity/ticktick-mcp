@@ -75,6 +75,19 @@ describe('TickTickClient', () => {
       await expect(client.getProjects()).rejects.toThrow(TickTickRateLimitError);
     });
 
+    it('getTask uses /project/{pid}/task/{tid} endpoint', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 't1', title: 'Test', projectId: 'inbox123' })),
+      });
+
+      await client.getTask('inbox123', 't1');
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.ticktick.com/open/v1/project/inbox123/task/t1',
+        expect.objectContaining({ method: 'GET' }),
+      );
+    });
+
     it('throws TickTickApiError on 500', async () => {
       mockFetch.mockResolvedValue({
         ok: false,

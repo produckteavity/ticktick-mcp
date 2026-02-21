@@ -48,7 +48,7 @@ export class TickTickClient {
   async getTask(projectId: string, taskId: string): Promise<unknown> {
     return this.request(
       'GET',
-      `/task/${encodeURIComponent(projectId)}/${encodeURIComponent(taskId)}`,
+      `/project/${encodeURIComponent(projectId)}/task/${encodeURIComponent(taskId)}`,
     );
   }
 
