@@ -1,0 +1,5 @@
+# Only send the 3 required files as Docker build context
+*
+!Dockerfile
+!entrypoint.sh
+!init-firewall.sh

@@ -1,0 +1,93 @@
+# Claude Code Sandboxed Development Container
+#
+# Usage:
+#   docker compose build                                      # build the image
+#   docker compose run --rm claude                            # interactive YOLO session
+#   docker compose run --rm claude -p "fix the auth bug"      # one-shot prompt
+#   docker compose run --rm -e SKIP_FIREWALL=1 claude         # without network restrictions
+#   docker compose run --rm -e EXTRA_DOMAINS="pypi.org" claude  # add allowed domains
+#
+# Required:
+#   ANTHROPIC_API_KEY must be set in your shell or in a .env file
+#
+# Linux users: set USER_UID and USER_GID to match your host user:
+#   USER_UID=1000 USER_GID=1000 docker compose build
+
+services:
+  claude:
+    build:
+      context: ./docker
+      dockerfile: Dockerfile
+      args:
+        CLAUDE_CODE_VERSION: latest
+        # Match your host user to avoid bind-mount permission issues.
+        # macOS default: UID=501 GID=20. Linux: typically UID=1000 GID=1000.
+        USER_UID: ${USER_UID:-501}
+        USER_GID: ${USER_GID:-20}
+    stdin_open: true
+    tty: true
+    init: true              # tini as PID 1 for proper signal forwarding + zombie reaping
+    restart: "no"           # interactive tool, not a long-running service
+
+    # ── Security hardening ─────────────────────────────────────────────
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN                 # required: iptables firewall setup (init only)
+      - NET_RAW                   # required: iptables firewall setup (init only)
+      - SETUID                    # required: gosu privilege drop (root → claude)
+      - SETGID                    # required: gosu privilege drop (root → claude)
+      - CHOWN                     # required: fix ownership of tmpfs mounts at init
+      - DAC_OVERRIDE              # required: entrypoint root operations on tmpfs
+    security_opt:
+      - no-new-privileges:true    # prevents claude user from regaining root
+    read_only: true               # immutable root filesystem
+
+    # ── Writable areas (tmpfs — ephemeral, not persisted) ──────────────
+    # /home/claude is tmpfs so .gitconfig, .bashrc etc. are writable.
+    # The .claude volume mount (below) layers on top for persistent state.
+    tmpfs:
+      - /tmp:rw,nosuid,size=1g
+      - /home/claude:rw,nosuid,size=512m
+      - /run:rw,noexec,nosuid,size=64m
+
+    # ── Volumes ────────────────────────────────────────────────────────
+    volumes:
+      # Project repo — the only rw bind mount.
+      # SECURITY: Claude Code can read/write all files here including .git/config.
+      # Run `git diff` after every session to review changes.
+      - .:/workspace:rw
+
+      # Claude Code state (persists across sessions)
+      - claude-config:/home/claude/.claude
+
+      # Optional: mount host claude settings read-only (uncomment to use)
+      # - ${HOME}/.claude/settings.json:/home/claude/.claude/settings.json:ro
+
+    # ── Environment ────────────────────────────────────────────────────
+    environment:
+      - ANTHROPIC_API_KEY               # required — from host env or .env file
+      - NODE_OPTIONS=--max-old-space-size=4096
+      # EXTRA_DOMAINS: pass at runtime to whitelist additional domains:
+      #   docker compose run --rm -e EXTRA_DOMAINS="pypi.org,custom.api.com" claude
+      # SKIP_FIREWALL: pass at runtime to disable network restrictions:
+      #   docker compose run --rm -e SKIP_FIREWALL=1 claude
+
+    # ── Resource limits ────────────────────────────────────────────────
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8g
+          pids: 512
+
+    # ── Logging ────────────────────────────────────────────────────────
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  claude-config:
+    name: claude-code-config

@@ -7,8 +7,6 @@ dist/
 
 # Local config
 .mcp.json
-docker-compose.yml
-docker/
 
 # IDE
 .idea/
