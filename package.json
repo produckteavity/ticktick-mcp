@@ -1,14 +1,16 @@
 {
-  "name": "ticktick-mcp",
+  "name": "ticktick-mcp-server",
   "version": "0.1.0",
   "type": "module",
-  "description": "MCP server for TickTick task management",
+  "description": "Connect AI assistants to your TickTick tasks via Model Context Protocol (MCP)",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/produckteavity/ticktick-mcp.git"
   },
-  "keywords": ["mcp", "ticktick", "model-context-protocol", "tasks"],
+  "homepage": "https://github.com/produckteavity/ticktick-mcp#readme",
+  "keywords": ["mcp", "mcp-server", "ticktick", "model-context-protocol", "tasks", "task-management", "ai", "llm", "claude", "productivity", "todo"],
+  "os": ["darwin"],
   "engines": {
     "node": ">=18.0.0"
   },
@@ -27,8 +29,8 @@
     "precommit": "npm audit --audit-level=high && vitest run"
   },
   "bin": {
-    "ticktick-mcp": "./dist/index.js",
-    "ticktick-mcp-auth": "./dist/auth-cli.js"
+    "ticktick-mcp-server": "./dist/index.js",
+    "ticktick-mcp-server-auth": "./dist/auth-cli.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.26.0",
