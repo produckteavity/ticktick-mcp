@@ -103,6 +103,12 @@ export const TickTickProjectData = z.object({
   tasks: z.array(TickTickTask).default([]),
 });
 
+/** Raw variant: accepts any array for tasks so one bad task doesn't cascade-fail the whole project. */
+export const TickTickProjectDataRaw = z.object({
+  project: TickTickProject,
+  tasks: z.array(z.unknown()).default([]),
+});
+
 // --- Inferred types ---
 
 export type CreateTaskInputType = z.infer<typeof CreateTaskInput>;

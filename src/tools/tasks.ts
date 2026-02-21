@@ -1,7 +1,9 @@
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { TickTickClient } from '../ticktick-client.js';
-import { CreateTaskInput, GetTaskInput, GetTasksInput, UpdateTaskInput, CompleteTaskInput, MoveTaskInput, TickTickTask, TickTickProjectData } from '../types.js';
+import { TickTickApiError, TickTickRateLimitError } from '../ticktick-client.js';
+import { AuthError } from '../auth.js';
+import { CreateTaskInput, GetTaskInput, GetTasksInput, UpdateTaskInput, CompleteTaskInput, MoveTaskInput, TickTickTask, TickTickProjectData, TickTickProjectDataRaw } from '../types.js';
 import { filterTasks } from '../filtering.js';
 
 function success(data: unknown) {
@@ -10,6 +12,32 @@ function success(data: unknown) {
 
 function error(msg: string) {
   return { content: [{ type: 'text' as const, text: msg }], isError: true as const };
+}
+
+export function formatToolError(e: unknown): string {
+  if (e instanceof TickTickRateLimitError) {
+    return `Rate limited. Try again in ${e.retryAfter} seconds.`;
+  }
+  if (e instanceof AuthError) {
+    return `Authentication failed. Run \`ticktick-mcp-auth\` to re-authorize.`;
+  }
+  if (e instanceof TickTickApiError) {
+    return e.message;
+  }
+  if (e instanceof ZodError) {
+    const firstIssue = e.issues[0];
+    return `Invalid input: ${firstIssue?.message ?? 'validation failed'}`;
+  }
+  if (e instanceof DOMException && e.name === 'AbortError') {
+    return 'Request timed out. Try again.';
+  }
+  if (e instanceof Error && e.name === 'TimeoutError') {
+    return 'Request timed out. Try again.';
+  }
+  if (e instanceof Error) {
+    return `Unexpected error: ${e.message}`;
+  }
+  return `Unexpected error: ${String(e)}`;
 }
 
 export function registerTaskTools(server: McpServer, client: TickTickClient): void {
@@ -31,8 +59,8 @@ export function registerTaskTools(server: McpServer, client: TickTickClient): vo
         const input = CreateTaskInput.parse({ title, content, projectId, tags, priority, dueDate, startDate, repeatFlag });
         const task = await client.createTask(input);
         return success(task);
-      } catch (e: any) {
-        return error(`Failed to create task: ${e.message}`);
+      } catch (e: unknown) {
+        return error(`Failed to create task: ${formatToolError(e)}`);
       }
     },
   );
@@ -48,8 +76,8 @@ export function registerTaskTools(server: McpServer, client: TickTickClient): vo
       try {
         const task = await client.getTask(projectId, taskId);
         return success(task);
-      } catch (e: any) {
-        return error(`Failed to get task: ${e.message}`);
+      } catch (e: unknown) {
+        return error(`Failed to get task: ${formatToolError(e)}`);
       }
     },
   );
@@ -68,26 +96,47 @@ export function registerTaskTools(server: McpServer, client: TickTickClient): vo
       try {
         const filters = GetTasksInput.parse({ projectId, tag, dueBefore, dueAfter, includeCompleted });
         let allTasks: unknown[] = [];
+        const warnings: string[] = [];
+        let failedProjectCount = 0;
 
         if (filters.projectId) {
           const data = await client.getProjectData(filters.projectId);
-          const parsed = TickTickProjectData.safeParse(data);
-          allTasks = parsed.success ? parsed.data.tasks : [];
+          const parsed = TickTickProjectDataRaw.safeParse(data);
+          if (!parsed.success) {
+            return error(`Failed to parse project data for project ${filters.projectId}`);
+          }
+          allTasks = parsed.data.tasks;
         } else {
           const projects = await client.getProjects() as Array<{ id: string }>;
           for (const project of projects) {
             const data = await client.getProjectData(project.id);
-            const parsed = TickTickProjectData.safeParse(data);
+            const parsed = TickTickProjectDataRaw.safeParse(data);
             if (parsed.success) {
               allTasks.push(...parsed.data.tasks);
+            } else {
+              failedProjectCount++;
             }
+          }
+          if (failedProjectCount > 0) {
+            warnings.push(`${failedProjectCount} project(s) could not be parsed and were skipped`);
           }
         }
 
+        let failedTaskCount = 0;
         const validTasks = allTasks
           .map((t) => TickTickTask.safeParse(t))
-          .filter((r) => r.success)
+          .filter((r) => {
+            if (!r.success) {
+              failedTaskCount++;
+              return false;
+            }
+            return true;
+          })
           .map((r) => r.data!);
+
+        if (failedTaskCount > 0) {
+          warnings.push(`${failedTaskCount} task(s) could not be parsed and were dropped`);
+        }
 
         const filtered = filterTasks(validTasks, {
           tag: filters.tag,
@@ -96,9 +145,9 @@ export function registerTaskTools(server: McpServer, client: TickTickClient): vo
           includeCompleted: filters.includeCompleted,
         });
 
-        return success(filtered);
-      } catch (e: any) {
-        return error(`Failed to get tasks: ${e.message}`);
+        return success({ tasks: filtered, warnings });
+      } catch (e: unknown) {
+        return error(`Failed to get tasks: ${formatToolError(e)}`);
       }
     },
   );
@@ -122,8 +171,8 @@ export function registerTaskTools(server: McpServer, client: TickTickClient): vo
         const { taskId: id, ...updates } = input;
         const task = await client.updateTask(id, updates);
         return success(task);
-      } catch (e: any) {
-        return error(`Failed to update task: ${e.message}`);
+      } catch (e: unknown) {
+        return error(`Failed to update task: ${formatToolError(e)}`);
       }
     },
   );
@@ -139,8 +188,8 @@ export function registerTaskTools(server: McpServer, client: TickTickClient): vo
       try {
         await client.completeTask(projectId, taskId);
         return success({ completed: true, taskId });
-      } catch (e: any) {
-        return error(`Failed to complete task: ${e.message}`);
+      } catch (e: unknown) {
+        return error(`Failed to complete task: ${formatToolError(e)}`);
       }
     },
   );
@@ -156,20 +205,26 @@ export function registerTaskTools(server: McpServer, client: TickTickClient): vo
     async ({ sourceProjectId, taskId, targetProjectId }) => {
       try {
         MoveTaskInput.parse({ sourceProjectId, taskId, targetProjectId });
-        const original = await client.getTask(sourceProjectId, taskId) as any;
+        const raw = await client.getTask(sourceProjectId, taskId);
+        const parsed = TickTickTask.safeParse(raw);
+        if (!parsed.success) {
+          return error(`Failed to move task: failed to validate the source task. It may not exist or the response was invalid.`);
+        }
+        const original = parsed.data;
         const newTask = await client.createTask({
           title: original.title,
           content: original.content,
           projectId: targetProjectId,
           tags: original.tags,
-          priority: original.priority,
-          dueDate: original.dueDate,
-          startDate: original.startDate,
+          priority: original.priority as 0 | 1 | 3 | 5 | undefined,
+          dueDate: original.dueDate ?? undefined,
+          startDate: original.startDate ?? undefined,
+          repeatFlag: original.repeatFlag,
         });
         await client.completeTask(sourceProjectId, taskId);
         return success({ moved: true, originalTaskId: taskId, newTask });
-      } catch (e: any) {
-        return error(`Failed to move task: ${e.message}`);
+      } catch (e: unknown) {
+        return error(`Failed to move task: ${formatToolError(e)}`);
       }
     },
   );
