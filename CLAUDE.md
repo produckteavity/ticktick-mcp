@@ -61,3 +61,50 @@ TICKTICK_CLIENT_ID=xxx npx vitest run tests/integration/spike-tags.test.ts
 - `tests/mcp/` — MCP protocol-level tests using `InMemoryTransport` and mock client
 - `tests/integration/` — Real API calls, skipped unless `TICKTICK_CLIENT_ID` is set
 - Vitest with `globals: true` — no need to import `describe`/`it`/`expect` (though files currently do)
+
+## Development Process
+
+All code changes MUST follow this process. No exceptions.
+
+### TDD Workflow (Red → Green → Refactor)
+
+Every bug fix and feature follows strict Test-Driven Development:
+
+1. **Red**: Write failing tests FIRST that describe the expected behavior
+   - Run the tests and confirm they fail for the right reason
+   - Tests should cover both the happy path and edge cases
+2. **Green**: Write the minimum implementation to make tests pass
+   - Run the targeted tests and confirm they pass
+3. **Refactor**: Clean up if needed while keeping tests green
+4. **Verify**: Run the FULL test suite (`npm test`) to catch regressions
+5. **Build**: Run `npm run build` to confirm TypeScript compiles cleanly
+
+### Issue-Driven Development
+
+When working on GitHub issues:
+
+1. **Read the issue** — understand the problem, root cause, and suggested fix
+2. **Read the relevant code** — understand current behavior before changing anything
+3. **Write tests first** (TDD Red phase) — tests should fail and demonstrate the bug or missing feature
+4. **Implement the fix** (TDD Green phase) — make the failing tests pass
+5. **Run full suite** — `npm run build && npm test` must both pass
+6. **Commit with issue reference** — use conventional commits: `fix: description (#N)` or `feat: description (#N)`
+
+### Commit Conventions
+
+- `fix:` for bug fixes
+- `feat:` for new features
+- `chore:` for maintenance/tooling
+- `ci:` for CI changes
+- Reference issues: `fix: validate token refresh (#9)`
+- One commit per logical change (can group related issues)
+
+### Parallel Agent Dispatch
+
+When dispatching agents for multiple issues:
+
+- **Group related issues** that touch the same code into one agent
+- **Define clear file boundaries** — each agent must know which files it owns
+- **Specify constraints explicitly** — what NOT to touch is as important as what to touch
+- **Each agent follows TDD independently** — write tests, see them fail, implement, see them pass
+- **Verify integration after all agents complete** — run full suite to catch conflicts
