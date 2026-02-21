@@ -90,6 +90,13 @@ When working on GitHub issues:
 5. **Run full suite** — `npm run build && npm test` must both pass
 6. **Commit with issue reference** — use conventional commits: `fix: description (#N)` or `feat: description (#N)`
 
+### Issue Lifecycle — CRITICAL RULES
+
+- **NEVER close an issue until the fix is merged to main.** Pushing to a branch or creating a PR is NOT enough.
+- **NEVER reference a PR in an issue close comment unless that PR contains the actual fix.**
+- The correct workflow: commit → push → create PR → CI passes → merge to main → THEN close issues referencing the merged PR.
+- Use `Closes #N` or `Fixes #N` in PR descriptions to let GitHub auto-close issues on merge — this prevents premature closure.
+
 ### Commit Conventions
 
 - `fix:` for bug fixes
