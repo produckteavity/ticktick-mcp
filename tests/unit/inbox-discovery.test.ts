@@ -190,6 +190,35 @@ describe('TickTickClient.getInboxProjectId', () => {
     expect(postTaskCalls).toHaveLength(1);
   });
 
+  it('retries discovery after a failure instead of caching the rejected promise', async () => {
+    // First call: API returns 500 — discovery fails
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      headers: { get: () => null },
+      text: () => Promise.resolve('Internal Server Error'),
+    });
+
+    await expect(client.getInboxProjectId()).rejects.toThrow();
+
+    // Second call: API succeeds — should retry, not return cached rejection
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({
+          id: 'probe-id-retry',
+          projectId: 'inbox-retry-ok',
+        })),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve(''),
+      });
+
+    const result = await client.getInboxProjectId();
+    expect(result).toBe('inbox-retry-ok');
+  });
+
   it('still returns discovered ID when keychain.set fails', async () => {
     // Mock probe task creation and completion
     mockFetch

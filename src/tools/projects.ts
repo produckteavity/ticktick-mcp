@@ -19,6 +19,24 @@ export function registerProjectTools(server: McpServer, client: TickTickClient):
     async () => {
       try {
         const projects = await client.getProjects();
+
+        // Try to include inbox project
+        try {
+          const inboxId = await client.getInboxProjectId();
+          const alreadyIncluded = (projects as Array<{ id: string }>).some((p) => p.id === inboxId);
+          if (!alreadyIncluded) {
+            const inboxData = await client.getProjectData(inboxId);
+            const parsed = inboxData && typeof inboxData === 'object' && 'project' in inboxData
+              ? (inboxData as { project: unknown }).project
+              : null;
+            if (parsed) {
+              return success([parsed, ...(projects as unknown[])]);
+            }
+          }
+        } catch {
+          // Inbox discovery failed — return regular projects only
+        }
+
         return success(projects);
       } catch (e: unknown) {
         return error(`Failed to get projects: ${formatToolError(e)}`);

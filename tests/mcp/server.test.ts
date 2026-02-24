@@ -171,6 +171,71 @@ describe('MCP Server', () => {
     await mcpClient.close();
   });
 
+  it('get_projects includes inbox project', async () => {
+    const server = new McpServer({ name: 'ticktick-mcp', version: '0.1.0' });
+    const mockClient = createMockClient();
+    mockClient.getProjects.mockResolvedValue([
+      { id: 'p1', name: 'Work' },
+    ]);
+    mockClient.getProjectData.mockResolvedValue({
+      project: { id: 'inbox123', name: 'Inbox' },
+      tasks: [],
+    });
+    mockClient.getInboxProjectId.mockResolvedValue('inbox123');
+
+    registerTaskTools(server, mockClient as any);
+    registerProjectTools(server, mockClient as any);
+
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const mcpClient = new Client({ name: 'test-client', version: '1.0' });
+    await mcpClient.connect(clientTransport);
+
+    const result = await mcpClient.callTool({
+      name: 'ticktick_get_projects',
+      arguments: {},
+    });
+
+    expect(result.isError).toBeFalsy();
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+    const parsed = JSON.parse(text);
+    const names = parsed.map((p: any) => p.name);
+    expect(names).toContain('Inbox');
+    expect(names).toContain('Work');
+
+    await mcpClient.close();
+  });
+
+  it('get_projects degrades gracefully if inbox discovery fails', async () => {
+    const server = new McpServer({ name: 'ticktick-mcp', version: '0.1.0' });
+    const mockClient = createMockClient();
+    mockClient.getProjects.mockResolvedValue([
+      { id: 'p1', name: 'Work' },
+    ]);
+    mockClient.getInboxProjectId.mockRejectedValue(new Error('Discovery failed'));
+
+    registerTaskTools(server, mockClient as any);
+    registerProjectTools(server, mockClient as any);
+
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const mcpClient = new Client({ name: 'test-client', version: '1.0' });
+    await mcpClient.connect(clientTransport);
+
+    const result = await mcpClient.callTool({
+      name: 'ticktick_get_projects',
+      arguments: {},
+    });
+
+    expect(result.isError).toBeFalsy();
+    const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+    const parsed = JSON.parse(text);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].name).toBe('Work');
+
+    await mcpClient.close();
+  });
+
   it('get_tasks degrades gracefully if inbox discovery fails', async () => {
     const server = new McpServer({ name: 'ticktick-mcp', version: '0.1.0' });
     const mockClient = createMockClient();

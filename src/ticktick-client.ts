@@ -39,7 +39,10 @@ export class TickTickClient {
     }
 
     if (!this.inboxDiscoveryPromise) {
-      this.inboxDiscoveryPromise = this._discoverInboxProjectId();
+      this.inboxDiscoveryPromise = this._discoverInboxProjectId().catch((err) => {
+        this.inboxDiscoveryPromise = null;
+        throw err;
+      });
     }
 
     return this.inboxDiscoveryPromise;
