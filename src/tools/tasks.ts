@@ -120,6 +120,20 @@ export function registerTaskTools(server: McpServer, client: TickTickClient): vo
           if (failedProjectCount > 0) {
             warnings.push(`${failedProjectCount} project(s) could not be parsed and were skipped`);
           }
+
+          // Also fetch inbox tasks
+          try {
+            const inboxId = await client.getInboxProjectId();
+            const inboxData = await client.getProjectData(inboxId);
+            const inboxParsed = TickTickProjectDataRaw.safeParse(inboxData);
+            if (inboxParsed.success) {
+              allTasks.push(...inboxParsed.data.tasks);
+            } else {
+              warnings.push('Inbox tasks could not be parsed and were skipped');
+            }
+          } catch {
+            warnings.push('Could not fetch inbox tasks — inbox discovery failed');
+          }
         }
 
         let failedTaskCount = 0;

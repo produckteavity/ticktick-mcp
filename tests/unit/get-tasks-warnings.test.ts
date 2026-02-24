@@ -16,6 +16,7 @@ function createMockClient(overrides: Record<string, any> = {}) {
     getTask: vi.fn(),
     updateTask: vi.fn(),
     completeTask: vi.fn(),
+    getInboxProjectId: vi.fn().mockResolvedValue('inbox000'),
     ...overrides,
   };
 }
@@ -104,6 +105,12 @@ describe('ticktick_get_tasks — warnings for data loss (issues #3 and #4)', () 
               tasks: [validTask('t1', 'p1'), validTask('t2', 'p1')],
             });
           }
+          if (projectId === 'inbox000') {
+            return Promise.resolve({
+              project: { id: 'inbox000', name: 'Inbox' },
+              tasks: [],
+            });
+          }
           // p2 returns invalid project data (missing project field)
           return Promise.resolve({ garbage: true });
         }),
@@ -178,9 +185,16 @@ describe('ticktick_get_tasks — warnings for data loss (issues #3 and #4)', () 
               tasks: [validTask('t1', 'p1'), invalidTask()],
             });
           }
+          if (projectId === 'p2') {
+            return Promise.resolve({
+              project: { id: 'p2', name: 'Project B' },
+              tasks: [validTask('t2', 'p2'), invalidTask(), invalidTask()],
+            });
+          }
+          // Inbox and other projects return empty
           return Promise.resolve({
-            project: { id: 'p2', name: 'Project B' },
-            tasks: [validTask('t2', 'p2'), invalidTask(), invalidTask()],
+            project: { id: projectId, name: 'Empty' },
+            tasks: [],
           });
         }),
       });
@@ -202,7 +216,15 @@ describe('ticktick_get_tasks — warnings for data loss (issues #3 and #4)', () 
           { id: 'p1' },
           { id: 'p2' },
         ]),
-        getProjectData: vi.fn().mockResolvedValue({ garbage: true }),
+        getProjectData: vi.fn().mockImplementation((projectId: string) => {
+          if (projectId === 'inbox000') {
+            return Promise.resolve({
+              project: { id: 'inbox000', name: 'Inbox' },
+              tasks: [],
+            });
+          }
+          return Promise.resolve({ garbage: true });
+        }),
       });
 
       const result = await callGetTasks(mockClient);
