@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+// --- Shared interfaces ---
+
+export interface KeychainLike {
+  get(account: string): Promise<string | null>;
+  set(account: string, password: string): Promise<void>;
+  remove(account: string): Promise<void>;
+}
+
 // --- Input schemas (tool parameters) ---
 
 export const CreateTaskInput = z.object({
