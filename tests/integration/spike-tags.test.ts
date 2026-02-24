@@ -25,7 +25,7 @@ describe.skipIf(SKIP)('Integration: Tag Support Spike', () => {
   const clientId = process.env.TICKTICK_CLIENT_ID!;
   const keychain = new Keychain('ticktick-mcp');
   const tokenManager = new TokenManager(keychain, clientId);
-  const client = new TickTickClient(tokenManager);
+  const client = new TickTickClient(tokenManager, keychain);
 
   let createdTaskId: string | undefined;
   let projectId: string | undefined;

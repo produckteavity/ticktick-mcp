@@ -1,5 +1,5 @@
 import type { TokenManager } from './auth.js';
-import type { CreateTaskInputType, UpdateTaskInputType } from './types.js';
+import type { CreateTaskInputType, KeychainLike, UpdateTaskInputType } from './types.js';
 
 const BASE_URL = 'https://api.ticktick.com/open/v1';
 const TIMEOUT_MS = 10_000;
@@ -24,10 +24,76 @@ export class TickTickRateLimitError extends TickTickApiError {
 type FetchFn = typeof globalThis.fetch;
 
 export class TickTickClient {
+  private inboxProjectId: string | null = null;
+  private inboxDiscoveryPromise: Promise<string> | null = null;
+
   constructor(
     private readonly tokenManager: TokenManager,
+    private readonly keychain: KeychainLike,
     private readonly fetchFn: FetchFn = globalThis.fetch,
   ) {}
+
+  async getInboxProjectId(): Promise<string> {
+    if (this.inboxProjectId) {
+      return this.inboxProjectId;
+    }
+
+    if (!this.inboxDiscoveryPromise) {
+      this.inboxDiscoveryPromise = this._discoverInboxProjectId();
+    }
+
+    return this.inboxDiscoveryPromise;
+  }
+
+  private async _discoverInboxProjectId(): Promise<string> {
+    // 1. Keychain
+    const cached = await this.keychain.get('inbox_id');
+    if (cached) {
+      this.inboxProjectId = cached;
+      return cached;
+    }
+
+    // 2. Discovery via probe task
+    const probeResponse = await this.request('POST', '/task', {
+      title: '__ticktick_mcp_inbox_probe__',
+    });
+
+    const probeProjectId =
+      probeResponse && typeof probeResponse === 'object' && 'projectId' in probeResponse
+        ? (probeResponse as { projectId: string }).projectId
+        : null;
+
+    if (!probeProjectId) {
+      throw new TickTickApiError(
+        0,
+        'Failed to discover inbox project ID: probe task response missing projectId',
+      );
+    }
+
+    const probeTaskId =
+      probeResponse && typeof probeResponse === 'object' && 'id' in probeResponse
+        ? (probeResponse as { id: string }).id
+        : null;
+
+    // Clean up probe task (non-fatal if it fails)
+    if (probeTaskId) {
+      try {
+        await this.completeTask(probeProjectId, probeTaskId);
+      } catch {
+        // Cleanup failure is non-fatal
+      }
+    }
+
+    // Cache in keychain (best-effort) and memory
+    try {
+      await this.keychain.set('inbox_id', probeProjectId);
+    } catch {
+      // Keychain persistence failed — memory cache still works for this session
+    }
+    this.inboxProjectId = probeProjectId;
+
+    return probeProjectId;
+  }
 
   async getProjects(): Promise<unknown[]> {
     return this.request('GET', '/project');
