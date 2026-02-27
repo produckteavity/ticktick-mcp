@@ -20,7 +20,7 @@ if (!clientId) {
 
 const keychain = new Keychain('ticktick-mcp');
 const tokenManager = new TokenManager(keychain, clientId);
-const ticktickClient = new TickTickClient(tokenManager);
+const ticktickClient = new TickTickClient(tokenManager, keychain);
 
 const server = new McpServer({
   name: 'ticktick-mcp',

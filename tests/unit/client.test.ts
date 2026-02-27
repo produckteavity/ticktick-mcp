@@ -6,12 +6,17 @@ describe('TickTickClient', () => {
     getValidAccessToken: vi.fn().mockResolvedValue('test-token'),
     forceRefresh: vi.fn().mockResolvedValue('refreshed-token'),
   };
+  const mockKeychain = {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(undefined),
+    remove: vi.fn().mockResolvedValue(undefined),
+  };
   const mockFetch = vi.fn();
   let client: TickTickClient;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    client = new TickTickClient(mockTokenManager as any, mockFetch as any);
+    client = new TickTickClient(mockTokenManager as any, mockKeychain, mockFetch as any);
   });
 
   describe('request', () => {

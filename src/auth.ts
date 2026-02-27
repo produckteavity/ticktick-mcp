@@ -1,16 +1,10 @@
-import { TokenRefreshResponse } from './types.js';
+import { TokenRefreshResponse, KeychainLike } from './types.js';
 
 export class AuthError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'AuthError';
   }
-}
-
-interface KeychainLike {
-  get(account: string): Promise<string | null>;
-  set(account: string, password: string): Promise<void>;
-  remove(account: string): Promise<void>;
 }
 
 type FetchFn = typeof globalThis.fetch;

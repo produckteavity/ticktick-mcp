@@ -21,6 +21,7 @@ function createMockClient() {
     }),
     updateTask: vi.fn().mockResolvedValue({ id: 't1', title: 'Updated' }),
     completeTask: vi.fn().mockResolvedValue(null),
+    getInboxProjectId: vi.fn().mockResolvedValue('inbox000'),
   };
 }
 

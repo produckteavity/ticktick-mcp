@@ -14,6 +14,14 @@ function error(msg: string) {
   return { content: [{ type: 'text' as const, text: msg }], isError: true as const };
 }
 
+/** Extract tasks array from data that has no project wrapper (e.g. inbox API response) */
+function extractTasksArray(data: unknown): unknown[] | null {
+  if (data && typeof data === 'object' && 'tasks' in data && Array.isArray((data as any).tasks)) {
+    return (data as any).tasks;
+  }
+  return null;
+}
+
 export function formatToolError(e: unknown): string {
   if (e instanceof TickTickRateLimitError) {
     return `Rate limited. Try again in ${e.retryAfter} seconds.`;
@@ -102,10 +110,17 @@ export function registerTaskTools(server: McpServer, client: TickTickClient): vo
         if (filters.projectId) {
           const data = await client.getProjectData(filters.projectId);
           const parsed = TickTickProjectDataRaw.safeParse(data);
-          if (!parsed.success) {
-            return error(`Failed to parse project data for project ${filters.projectId}`);
+          if (parsed.success) {
+            allTasks = parsed.data.tasks;
+          } else {
+            // Inbox API returns { tasks: [...] } without project wrapper
+            const tasksOnly = extractTasksArray(data);
+            if (tasksOnly) {
+              allTasks = tasksOnly;
+            } else {
+              return error(`Failed to parse project data for project ${filters.projectId}`);
+            }
           }
-          allTasks = parsed.data.tasks;
         } else {
           const projects = await client.getProjects() as Array<{ id: string }>;
           for (const project of projects) {
@@ -119,6 +134,29 @@ export function registerTaskTools(server: McpServer, client: TickTickClient): vo
           }
           if (failedProjectCount > 0) {
             warnings.push(`${failedProjectCount} project(s) could not be parsed and were skipped`);
+          }
+
+          // Also fetch inbox tasks
+          try {
+            const inboxId = await client.getInboxProjectId();
+            const alreadyFetched = projects.some((p) => p.id === inboxId);
+            if (!alreadyFetched) {
+              const inboxData = await client.getProjectData(inboxId);
+              const inboxParsed = TickTickProjectDataRaw.safeParse(inboxData);
+              if (inboxParsed.success) {
+                allTasks.push(...inboxParsed.data.tasks);
+              } else {
+                // Inbox API returns { tasks: [...] } without project wrapper
+                const tasksOnly = extractTasksArray(inboxData);
+                if (tasksOnly) {
+                  allTasks.push(...tasksOnly);
+                } else {
+                  warnings.push('Inbox tasks could not be parsed and were skipped');
+                }
+              }
+            }
+          } catch {
+            warnings.push('Could not fetch inbox tasks — inbox discovery failed');
           }
         }
 
