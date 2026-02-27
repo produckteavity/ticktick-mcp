@@ -26,11 +26,15 @@ export function registerProjectTools(server: McpServer, client: TickTickClient):
           const alreadyIncluded = (projects as Array<{ id: string }>).some((p) => p.id === inboxId);
           if (!alreadyIncluded) {
             const inboxData = await client.getProjectData(inboxId);
-            const parsed = inboxData && typeof inboxData === 'object' && 'project' in inboxData
-              ? (inboxData as { project: unknown }).project
-              : null;
-            if (parsed) {
-              return success([parsed, ...(projects as unknown[])]);
+            let inboxProject: unknown = null;
+            if (inboxData && typeof inboxData === 'object' && 'project' in inboxData) {
+              inboxProject = (inboxData as { project: unknown }).project;
+            } else {
+              // Inbox API returns { tasks: [...] } without project metadata — synthesize it
+              inboxProject = { id: inboxId, name: 'Inbox' };
+            }
+            if (inboxProject) {
+              return success([inboxProject, ...(projects as unknown[])]);
             }
           }
         } catch {

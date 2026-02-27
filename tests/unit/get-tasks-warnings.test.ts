@@ -106,10 +106,8 @@ describe('ticktick_get_tasks — warnings for data loss (issues #3 and #4)', () 
             });
           }
           if (projectId === 'inbox000') {
-            return Promise.resolve({
-              project: { id: 'inbox000', name: 'Inbox' },
-              tasks: [],
-            });
+            // Real TickTick API returns { tasks: [...] } without project wrapper for inbox
+            return Promise.resolve({ tasks: [] });
           }
           // p2 returns invalid project data (missing project field)
           return Promise.resolve({ garbage: true });
@@ -191,7 +189,10 @@ describe('ticktick_get_tasks — warnings for data loss (issues #3 and #4)', () 
               tasks: [validTask('t2', 'p2'), invalidTask(), invalidTask()],
             });
           }
-          // Inbox and other projects return empty
+          if (projectId === 'inbox000') {
+            // Real TickTick API returns { tasks: [...] } without project wrapper for inbox
+            return Promise.resolve({ tasks: [] });
+          }
           return Promise.resolve({
             project: { id: projectId, name: 'Empty' },
             tasks: [],
@@ -218,10 +219,8 @@ describe('ticktick_get_tasks — warnings for data loss (issues #3 and #4)', () 
         ]),
         getProjectData: vi.fn().mockImplementation((projectId: string) => {
           if (projectId === 'inbox000') {
-            return Promise.resolve({
-              project: { id: 'inbox000', name: 'Inbox' },
-              tasks: [],
-            });
+            // Real TickTick API returns { tasks: [...] } without project wrapper for inbox
+            return Promise.resolve({ tasks: [] });
           }
           return Promise.resolve({ garbage: true });
         }),
